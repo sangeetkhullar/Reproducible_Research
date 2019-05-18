@@ -1,0 +1,187 @@
+---
+title: "Programming Assignment 1 - Reproducible Research"
+author: "Sangeet Khullar"
+date: "May 17, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Read CSV Input
+
+```{r readData}
+#setwd("C:\\Users\\skhullar\\OneDrive - Daiichi Sankyo\\Documents\\GitHub\\Reproducible_Research")
+act <- read.csv("activity.csv")
+dim(act)
+```
+
+## Find Mean & Median Steps Per Day   
+
+**1. Sum up all the steps for a given Day - ( Sum(steps) - group by Date )**
+
+
+**2. Display Histogram of Steps Per Day** 
+
+
+```{r histogramStepsPerDay, echo=TRUE }
+library(dplyr)
+steps_per_day_dframe <- act    %>% group_by(date) %>% summarize(steps_per_day=sum(steps))   
+hist(steps_per_day_dframe$steps_per_day)
+```
+
+
+**3. Display BarPlot of Steps Per Day**
+
+
+```{r barPlotStepsPerDay, echo=TRUE }
+barplot(steps_per_day_dframe$steps_per_day)
+```
+
+**4. Find Mean & Median value per day  from the above aggregated dataset**  
+
+```{r findMeanNmedianStepsPerDay, echo=TRUE }
+mean_steps_per_day <- steps_per_day_dframe %>% summarize(mean_steps_per_day=mean(steps_per_day,na.rm = TRUE))
+print(paste("Mean_Steps_Per_Day=",mean_steps_per_day))
+
+
+
+median_steps_per_day <- steps_per_day_dframe %>% summarize(median_steps_per_day=median(steps_per_day,na.rm = TRUE))
+print(paste("Median_Steps_Per_Day=",median_steps_per_day))
+
+```
+
+
+## Average daily activity pattern
+
+**1. Time series plot of the 5-minute interval & the average number of steps taken, averaged across all days** 
+
+
+```{r timeSeriesPlot_DailyActivity, echo=TRUE }
+library(ggplot2)
+
+avg_steps_per_5min_interval <- act    %>% group_by(interval) %>% summarize(avg_steps_for_interval= mean(steps,na.rm = TRUE))
+  
+ggplot(data = avg_steps_per_5min_interval, aes(x = interval, y = avg_steps_for_interval))+
+  geom_line(color = "#00AFBB", size = 2) + 
+   geom_smooth(method = "lm") + 
+     labs(x = "Time Interval in Seconds ") +
+          labs(y = "Average Number of Steps") + 
+            labs(title = "Time Series Data for Number of Steps Across the Day")
+
+
+
+```
+
+
+**2. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?**
+
+
+```{r findMaxStepAverageInterval, echo=TRUE }
+max_step_average <- max(avg_steps_per_5min_interval$avg_steps_for_interval, na.rm = TRUE)
+
+max_step_average_interval <- avg_steps_per_5min_interval[which(avg_steps_per_5min_interval$avg_steps_for_interval == 
+                                   max_step_average), ]
+print(paste("Max_Step_Average_Interval=",max_step_average_interval$interval))
+```
+
+
+
+## Imputing missing values
+
+**Report the total number of missing values in the dataset**
+```{r countNA, echo=TRUE }
+summary(act)
+count_na_values <- sum(is.na(act$steps))
+print(paste("Count_Of_Records_With_Missing_Step_Values=",count_na_values))
+```
+
+
+**Fill up the missing values in the dataset** 
+```{r imputeDataFrame, echo=TRUE }
+library(mice)
+tempData <- mice(act,m=5,maxit=50,meth='pmm',seed=500)
+completedData <- complete(tempData,1)
+```
+
+
+
+**Create a new Data Set with missing values populated**
+```{r newImputeDataFrame, echo=TRUE }
+completedData <- complete(tempData,1)
+```
+
+**Make a histogram of the total number of steps taken each day** 
+```{r histogramStepsPerDayAfterImput, echo=TRUE }
+steps_per_day_dframe_after_imput <- completedData    %>% group_by(date) %>% summarize(steps_per_day=sum(steps))   
+hist(steps_per_day_dframe_after_imput$steps_per_day)
+```
+
+
+
+**Calculate the mean and median total number of steps taken per day AFTER Imput** 
+```{r findMeanNmedianStepsPerDayAfterImput, echo=TRUE }
+mean_steps_per_day_after_imput  <- steps_per_day_dframe_after_imput %>% summarize(mean_steps_per_day=mean(steps_per_day,na.rm = TRUE))
+print(paste("Mean_Steps_Per_Day_After_Imput=",mean_steps_per_day_after_imput))
+
+
+
+median_steps_per_day_after_imput <- steps_per_day_dframe_after_imput %>% summarize(median_steps_per_day=median(steps_per_day,na.rm = TRUE))
+print(paste("Median_Steps_Per_Day_After_Imput=",median_steps_per_day_after_imput))
+
+```
+
+
+**Mean & Median Before Imput** 
+```{r MeanNmedianStepsPerDayBeforeImput, echo=TRUE }
+print(paste("Mean_Steps_Per_Day_Before_Imput=",mean_steps_per_day))
+
+print(paste("Median_Steps_Per_Day_Before_Imput=",median_steps_per_day))
+
+```
+
+**Impact of imputing missing data on the estimates of the total daily number of steps**
+```{r impactOfImputing, echo=TRUE }
+diff_mean <-  mean_steps_per_day_after_imput -mean_steps_per_day
+print(paste("Change_in_Mean_Steps_Per_day=",diff_mean))
+
+diff_median <- median_steps_per_day_after_imput - median_steps_per_day
+print(paste("Change_in_Median_Steps_Per_day=",diff_median))
+
+```
+
+
+## Differences in activity patterns between weekdays and weekends
+
+**New factor variable weekday and weekend**
+```{r weekDayNweekEnd, echo=TRUE }
+for (row in 1:nrow(completedData)) {
+    day  <- weekdays(as.Date(completedData[row, "date"]))
+       if(day %in% c("Monday","Tuesday","Wednesday","Thursday","Friday")) 
+         {
+        completedData[row,"is_Weekday"] <- "1" 
+         }
+        else 
+          {
+        completedData[row,"is_Weekday"] <- "0"    
+          }
+}
+```
+
+
+**Panel Time Series Plot time series plot** 
+```{r timeSeries_WeekDayNWeekEnd, echo=TRUE }
+avg_steps_per_5min_interval_imp <- completedData  %>% group_by(interval,is_Weekday) %>% 
+      summarize(avg_steps_for_interval= mean(steps,na.rm = TRUE))
+  
+ggplot(data = avg_steps_per_5min_interval_imp, aes(x = interval, y = avg_steps_for_interval ,color=is_Weekday))+
+   facet_grid( .~ is_Weekday) + 
+    geom_smooth(method = "lm") + 
+     labs(x = "Time Interval in Seconds ") +
+          labs(y = "Average Number of Steps") + 
+            labs(title = "Time Series Data for Number of Steps Across the Day")
+```
+
+
+## The End 
